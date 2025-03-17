@@ -25,7 +25,6 @@ import logging
 from typing import Literal, Optional
 
 import torch
-import os
 
 from diffusers import (
     CogVideoXDPMScheduler,
@@ -35,8 +34,6 @@ from diffusers import (
 )
 from diffusers.utils import export_to_video, load_image, load_video
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from transformers import AutoModel
 
 logging.basicConfig(level=logging.INFO)
 
@@ -60,7 +57,7 @@ def generate_video(
     num_frames: int = 81,
     width: Optional[int] = None,
     height: Optional[int] = None,
-    output_path: str = "outputs/debugging/new_prompt_output.mp4",
+    output_path: str = "outputs/debugging/output.mp4",
     image_or_video_path: str = "",
     num_inference_steps: int = 50,
     guidance_scale: float = 6.0,
@@ -220,38 +217,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     dtype = torch.float16 if args.dtype == "float16" else torch.bfloat16
-    
-    query = args.prompt
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0' # 设置 GPU 编号，如果单机单卡指定一个，单机多卡指定多个 GPU 编号
-    MODEL_PATH = "THUDM/glm-4-9b-chat-hf"
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
-    inputs = tokenizer.apply_chat_template([{"role": "user", "content": query}],
-                                        add_generation_prompt=True,
-                                        tokenize=True,
-                                        return_tensors="pt",
-                                        return_dict=True
-                                        )
-    inputs = inputs.to(device)
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_PATH,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        trust_remote_code=True,
-        device_map="auto"
-    ).eval()
-
-    gen_kwargs = {"max_length": 2500, "do_sample": True, "top_k": 1}
-    with torch.no_grad():
-        outputs = model.generate(**inputs, **gen_kwargs)
-        outputs = outputs[:, inputs['input_ids'].shape[1]:]
-        new_prompt = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print(new_prompt)
-
-    new_prompt.replace("\n","").replace('Image: ','').replace("]","").replace("[","")
-    
     generate_video(
-        prompt=new_prompt,
+        prompt=args.prompt,
         model_path=args.model_path,
         lora_path=args.lora_path,
         lora_rank=args.lora_rank,

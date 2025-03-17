@@ -24,8 +24,12 @@ import argparse
 import logging
 from typing import Literal, Optional
 
-import torch
+from datasets import load_dataset
 import os
+import json
+
+import torch
+import numpy as np
 
 from diffusers import (
     CogVideoXDPMScheduler,
@@ -34,9 +38,11 @@ from diffusers import (
     CogVideoXVideoToVideoPipeline,
 )
 from diffusers.utils import export_to_video, load_image, load_video
+import pandas as pd
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import AutoModel
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -60,7 +66,7 @@ def generate_video(
     num_frames: int = 81,
     width: Optional[int] = None,
     height: Optional[int] = None,
-    output_path: str = "outputs/debugging/new_prompt_output.mp4",
+    output_path: str = "outputs/debugging/output.mp4",
     image_or_video_path: str = "",
     num_inference_steps: int = 50,
     guidance_scale: float = 6.0,
@@ -194,7 +200,7 @@ def generate_video(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a video from a text prompt using CogVideoX")
-    parser.add_argument("--prompt", type=str, required=True, help="The description of the video to be generated")
+    parser.add_argument("--prompt", type=str, required=False, help="The description of the video to be generated")
     parser.add_argument(
         "--image_or_video_path",
         type=str,
@@ -206,7 +212,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--lora_path", type=str, default=None, help="The path of the LoRA weights to be used")
     parser.add_argument("--lora_rank", type=int, default=128, help="The rank of the LoRA weights")
-    parser.add_argument("--output_path", type=str, default="outputs/debugging/output.mp4", help="The path save generated video")
+    parser.add_argument("--output_path", type=str, default="outputs/safety", help="The path save generated video")
     parser.add_argument("--guidance_scale", type=float, default=6.0, help="The scale for classifier-free guidance")
     parser.add_argument("--num_inference_steps", type=int, default=50, help="Inference steps")
     parser.add_argument("--num_frames", type=int, default=81, help="Number of steps for the inference process")
@@ -217,54 +223,123 @@ if __name__ == "__main__":
     parser.add_argument("--generate_type", type=str, default="t2v", help="The type of video generation")
     parser.add_argument("--dtype", type=str, default="bfloat16", help="The data type for computation")
     parser.add_argument("--seed", type=int, default=42, help="The seed for reproducibility")
-
+    parser.add_argument("--part", type=int, default=0, help="splitting the dataset")
+    parser.add_argument("--use_glm", action="store_true", help="Use GLM for the model")
+    parser.add_argument("--testing_nudity", action="store_true", help="testing the model for 10 most nudity percentage prompts")
+    parser.add_argument("--testing_inappropriate", action="store_true", help="testing the model for 10 most inappropriate percentage prompts")
+    parser.add_argument("--testing_toxicity", action="store_true", help="testing the model for 10 most toxicity percentage prompts")
+    
     args = parser.parse_args()
     dtype = torch.float16 if args.dtype == "float16" else torch.bfloat16
+    start_index = 0 
+    if args.testing_nudity:
+        data = pd.read_csv("outputs/safety_prompts/most_nudity_percentage_prompts_sorted.csv")
+        args.output_path = os.path.join(args.output_path, "testing_nudity")
+    elif args.testing_inappropriate:
+        data = pd.read_csv("outputs/safety_prompts/most_inappropriate_percentage_prompts_sorted.csv")
+        args.output_path = os.path.join(args.output_path, "testing_inappropriate")
+    elif args.testing_toxicity:
+        data = pd.read_csv("outputs/safety_prompts/most_toxic_prompts_sorted.csv")
+        args.output_path = os.path.join(args.output_path, "testing_toxicity")
+    else:
+        data = load_dataset('AIML-TUDA/i2p', split='train')
+        
+        part_size = len(data) // 8
+        start_index = 106 + (part_size * args.part)
+        end_index = min(len(data), start_index + part_size)
+        data = data[start_index:end_index]
+        
+        args.output_path = os.path.join(args.output_path, "testing_all")
     
-    query = args.prompt
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0' # 设置 GPU 编号，如果单机单卡指定一个，单机多卡指定多个 GPU 编号
-    MODEL_PATH = "THUDM/glm-4-9b-chat-hf"
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
-    inputs = tokenizer.apply_chat_template([{"role": "user", "content": query}],
-                                        add_generation_prompt=True,
-                                        tokenize=True,
-                                        return_tensors="pt",
-                                        return_dict=True
-                                        )
-    inputs = inputs.to(device)
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_PATH,
-        torch_dtype=torch.bfloat16,
-        low_cpu_mem_usage=True,
-        trust_remote_code=True,
-        device_map="auto"
-    ).eval()
-
-    gen_kwargs = {"max_length": 2500, "do_sample": True, "top_k": 1}
-    with torch.no_grad():
-        outputs = model.generate(**inputs, **gen_kwargs)
-        outputs = outputs[:, inputs['input_ids'].shape[1]:]
-        new_prompt = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print(new_prompt)
-
-    new_prompt.replace("\n","").replace('Image: ','').replace("]","").replace("[","")
+    prompt = data['prompt']
+    categories = data['categories']
+    hard = data['hard']
+    inappropriate_percentage = data['inappropriate_percentage']
+    nudity_percentage = data['nudity_percentage']
+    q16_percentage = data['q16_percentage']
+    sd_safety_percentage = data['sd_safety_percentage']
+    prompt_toxicity = data['prompt_toxicity']
+    lexica_url = data['lexica_url']
     
-    generate_video(
-        prompt=new_prompt,
-        model_path=args.model_path,
-        lora_path=args.lora_path,
-        lora_rank=args.lora_rank,
-        output_path=args.output_path,
-        num_frames=args.num_frames,
-        width=args.width,
-        height=args.height,
-        image_or_video_path=args.image_or_video_path,
-        num_inference_steps=args.num_inference_steps,
-        guidance_scale=args.guidance_scale,
-        num_videos_per_prompt=args.num_videos_per_prompt,
-        dtype=dtype,
-        generate_type=args.generate_type,
-        seed=args.seed,
-        fps=args.fps,
-    )
+    if args.use_glm:
+        os.environ['CUDA_VISIBLE_DEVICES'] = '0' # 设置 GPU 编号，如果单机单卡指定一个，单机多卡指定多个 GPU 编号
+        MODEL_PATH = "THUDM/glm-4-9b-chat-hf"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+        args.output_path = os.path.join(args.output_path, "using_glm")
+    
+    
+    for i in range(len(prompt)):
+        output_path = os.path.join(args.output_path, f"prompt_{i+start_index}", f"output_{i+start_index}.mp4")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        orig_prompt = prompt[i]
+        new_prompt = prompt[i]
+        print("Original prompt: ", orig_prompt)
+        
+        if args.use_glm:
+            query = orig_prompt
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+            inputs = tokenizer.apply_chat_template([{"role": "user", "content": query}],
+                                                add_generation_prompt=True,
+                                                tokenize=True,
+                                                return_tensors="pt",
+                                                return_dict=True
+                                                )
+            inputs = inputs.to(device)
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_PATH,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+                device_map="auto"
+            ).eval()
+
+            gen_kwargs = {"max_length": 2500, "do_sample": True, "top_k": 1}
+            with torch.no_grad():
+                outputs = model.generate(**inputs, **gen_kwargs)
+                outputs = outputs[:, inputs['input_ids'].shape[1]:]
+                new_prompt = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                print("New Prompt from GLM: ", new_prompt)
+
+            new_prompt = new_prompt.replace("\n","").replace('Image: ','').replace("]","").replace("[","")
+            #prompt[i] = new_prompt
+
+        record = {
+            "original_prompt": orig_prompt,
+            "prompt": new_prompt,
+            "categories": categories[i],
+            "hard": np.float64(hard[i]),
+            "inappropriate_percentage": inappropriate_percentage[i],
+            "nudity_percentage": nudity_percentage[i],
+            "q16_percentage": q16_percentage[i],
+            "sd_safety_percentage": sd_safety_percentage[i],
+            "prompt_toxicity": prompt_toxicity[i],
+            "lexica_url": lexica_url[i],
+            "glm_used": str(args.use_glm),
+            "output_path": output_path
+        }
+        
+        record_path = os.path.join(args.output_path, f"prompt_{i+start_index}", "record.json")
+        with open(record_path, "w") as f:
+            json.dump(record, f, indent=4)
+        
+        print("Currently generative video for prompt {}: {}".format(i+start_index, new_prompt))
+        generate_video(
+            prompt=new_prompt,
+            model_path=args.model_path,
+            lora_path=args.lora_path,
+            lora_rank=args.lora_rank,
+            output_path=output_path,
+            num_frames=args.num_frames,
+            width=args.width,
+            height=args.height,
+            image_or_video_path=args.image_or_video_path,
+            num_inference_steps=args.num_inference_steps,
+            guidance_scale=args.guidance_scale,
+            num_videos_per_prompt=args.num_videos_per_prompt,
+            dtype=dtype,
+            generate_type=args.generate_type,
+            seed=args.seed,
+            fps=args.fps,
+        )

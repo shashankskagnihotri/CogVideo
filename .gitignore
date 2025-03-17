@@ -35,3 +35,6 @@ CogVideo-1.0
 **/train_res*
 
 **/uv.lock
+
+slurm/
+outputs/
