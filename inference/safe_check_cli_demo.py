@@ -260,6 +260,10 @@ if __name__ == "__main__":
     sd_safety_percentage = data['sd_safety_percentage']
     prompt_toxicity = data['prompt_toxicity']
     lexica_url = data['lexica_url']
+    if 'index' in data.column_names:
+        index = data["index"]
+    else:
+        index = range(len(data))
     
     if args.use_glm:
         os.environ['CUDA_VISIBLE_DEVICES'] = '0' # 设置 GPU 编号，如果单机单卡指定一个，单机多卡指定多个 GPU 编号
@@ -270,7 +274,7 @@ if __name__ == "__main__":
     
     
     for i in range(len(prompt)):
-        output_path = os.path.join(args.output_path, f"prompt_{i+start_index}", f"output_{i+start_index}.mp4")
+        output_path = os.path.join(args.output_path, f"prompt_{index[i]+start_index}", f"output_{index[i]+start_index}.mp4")
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         orig_prompt = prompt[i]
@@ -320,7 +324,7 @@ if __name__ == "__main__":
             "output_path": output_path
         }
         
-        record_path = os.path.join(args.output_path, f"prompt_{i+start_index}", "record.json")
+        record_path = os.path.join(args.output_path, f"prompt_{index[i]+start_index}", "record.json")
         with open(record_path, "w") as f:
             json.dump(record, f, indent=4)
         
