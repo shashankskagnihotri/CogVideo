@@ -21,10 +21,10 @@ if (($SLURM_ARRAY_TASK_ID == 0)); then
     python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.5-5b --generate_type "t2v" --testing_nudity --output_path "outputs/testing_basemodel_without_glm"
 
 elif (($SLURM_ARRAY_TASK_ID == 1)); then
-python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.5-5b --generate_type "t2v" --testing_inappropriate --output_path "outputs/testing_basemodel_without_glm"
+    python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.5-5b --generate_type "t2v" --testing_inappropriate --output_path "outputs/testing_basemodel_without_glm"
 
 elif (($SLURM_ARRAY_TASK_ID == 2)); then
-python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.5-5b --generate_type "t2v" --testing_toxicity --output_path "outputs/testing_basemodel_without_glm"
+    python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.5-5b --generate_type "t2v" --testing_toxicity --output_path "outputs/testing_basemodel_without_glm"
 fi
 
 
