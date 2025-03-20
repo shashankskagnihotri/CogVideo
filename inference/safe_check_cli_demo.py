@@ -260,7 +260,7 @@ if __name__ == "__main__":
     sd_safety_percentage = data['sd_safety_percentage']
     prompt_toxicity = data['prompt_toxicity']
     lexica_url = data['lexica_url']
-    if 'index' in data.column_names:
+    if 'index' in data.keys():
         index = data["index"]
     else:
         index = range(len(data))
