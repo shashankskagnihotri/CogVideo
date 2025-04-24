@@ -28,6 +28,7 @@ python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.
 fi
 
 
+python -W ignore inference/safe_check_cli_demo.py --model_path THUDM/CogVideoX1.5-5b --generate_type "t2v" --testing_nudity --use_glm --output_path "outputs/testing_basemodel_with_abliterated_glm"
 end=`date +%s`
 runtime=$((end-start))
 

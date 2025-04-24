@@ -38,3 +38,13 @@ CogVideo-1.0
 
 slurm/
 outputs/
+working/
+
+.mp4
+.pt
+*_debug*
+
+inference/openai_chatgpt.py
+inference/gemma3_chat.py 
+inference/paligemma_2_chat.py
+inference/multiple_VLMs_chat.py
