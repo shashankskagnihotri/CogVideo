@@ -17,7 +17,7 @@ os.makedirs(plot_save_path, exist_ok=True)
 
 # Define configurations
 configs = [
-    ("testing_abliterated_glm_without_prompt_prefix", "using_glm"),
+    #("testing_abliterated_glm_without_prompt_prefix", "using_glm"),
     ("testing_baseline_without_prompt_prefix", None)
 ]
 negative_prompt_options = ["using_negative_prompt", "without_negative_prompt"]
@@ -85,21 +85,25 @@ def plot_embeddings(embeddings, labels, title, save_path):
 
 for config in configs:
     for negative_prompt in negative_prompt_options:
-        if 'abliterated' in config[0]:
-            name = "abliterated GLM-4"
-        else:
-            name = "baseline"
-        for step in tqdm(range(num_steps), desc=f"Processing {name} - {negative_prompt}"):
-            embeddings = []
-            labels = []
-            prompt_base_path = os.path.join(
+        prompt_base_path = os.path.join(
                 base_path,
                 config[0],
                 "testing_gpt4_nudity",
                 negative_prompt
             )
-            #import ipdb; ipdb.set_trace()
+        
+        if 'abliterated' in config[0]:
+            name = "abliterated GLM-4"
             prompt_folders = glob.glob(os.path.join(prompt_base_path, "*", "*", "prompt_*"))
+        else:
+            name = "baseline"
+            prompt_folders = glob.glob(os.path.join(prompt_base_path, "*", "prompt_*"))
+        for step in tqdm(range(num_steps), desc=f"Processing {name} - {negative_prompt}"):
+            embeddings = []
+            labels = []
+            
+            #import ipdb; ipdb.set_trace()
+            
             if len(prompt_folders) == 0:
                 print(f"No prompt folders found for {config[0]} with {negative_prompt} at step {step}.")
                 import ipdb; ipdb.set_trace()

@@ -159,8 +159,8 @@ class CogVideoXPipelineWithHiddenStates(CogVideoXPipeline):
         shield_processor = None,
         shield_gemma2_warm_up: int = 0, # 0 means no warm up for inference steps before which shield gemma is to be used
         use_shield_gemma2_guidance: bool = True,
-        shield_gemma2_threshold: float = 0.2, # 0.2 means guide if more than 20% Yes for policy
-        epsilon: float = 0.1, # 0.05, # step size for changing latents
+        shield_gemma2_threshold: float = 0.05, # 0.2 means guide if more than 20% Yes for policy
+        epsilon: float = 0.01, # 0.05, # step size for changing latents
     ) -> Union[CogVideoXPipelineOutput, Tuple]:
         """
         Function invoked when calling the pipeline for generation.
